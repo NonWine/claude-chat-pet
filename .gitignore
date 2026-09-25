@@ -1,0 +1,13 @@
+# Runtime job artifacts (prompts, stream-json logs) - private, regenerated on each run
+jobs/
+
+# Logs
+*.log
+last-error.txt
+last-response.txt
+
+# Pre-git backups, superseded by git history
+.backup/
+
+# Local, machine-specific
+config.json

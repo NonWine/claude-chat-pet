@@ -1,0 +1,44 @@
+﻿{
+    "placeholder":  true,
+    "source":  "Pixel Buddy from claude-code-mascot-statusline (MIT)",
+    "note":  "Placeholder art. Replace the PNGs in frames\\\u003cstate\u003e\\ to swap the character.",
+    "width":  16,
+    "height":  16,
+    "states":  {
+                   "idle":  {
+                                "frameMs":  900,
+                                "loop":  true,
+                                "frames":  2
+                            },
+                   "hover":  {
+                                 "frameMs":  0,
+                                 "loop":  false,
+                                 "frames":  1
+                             },
+                   "input":  {
+                                 "frameMs":  0,
+                                 "loop":  false,
+                                 "frames":  1
+                             },
+                   "working":  {
+                                   "frameMs":  180,
+                                   "loop":  true,
+                                   "frames":  2
+                               },
+                   "thinking":  {
+                                    "frameMs":  300,
+                                    "loop":  true,
+                                    "frames":  3
+                                },
+                   "done":  {
+                                "frameMs":  450,
+                                "loop":  true,
+                                "frames":  2
+                            },
+                   "blocking":  {
+                                    "frameMs":  1400,
+                                    "loop":  true,
+                                    "frames":  2
+                                }
+               }
+}

@@ -1,0 +1,378 @@
+<title>Pet State Sprites</title>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#0b0d11;
+    --panel:#17191f;
+    --panel-2:#1e2129;
+    --border:rgba(255,255,255,0.08);
+    --border-2:rgba(255,255,255,0.14);
+    --text:#eef0f3;
+    --text-dim:#9aa2ad;
+    --text-faint:#5b616e;
+    --accent-idle:#8b93a6;
+    --accent-working:#6ea8fe;
+    --accent-done:#57c08d;
+    --accent-blocking:#e0a33e;
+    --accent-blocking-2:#e06c75;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    padding-inline:16px;
+    padding-block:40px;
+    display:flex;
+    justify-content:center;
+  }
+  .page{ width:100%; max-width:640px; display:flex; flex-direction:column; gap:36px; }
+
+  header{ display:flex; flex-direction:column; gap:8px; }
+  .eyebrow{
+    font-family:'Press Start 2P',monospace;
+    font-size:10px;
+    letter-spacing:0.04em;
+    color:var(--accent-working);
+  }
+  h1{ margin:0; font-size:26px; font-weight:700; letter-spacing:-0.01em; }
+  .desc{ margin:0; color:var(--text-dim); font-size:14px; line-height:1.55; max-width:56ch; }
+  .credit{ margin:0; color:var(--text-faint); font-size:12px; }
+  .credit a{ color:var(--text-faint); }
+  .credit a:hover{ color:var(--text-dim); }
+
+  /* --- widget mockup --- */
+  .stage{ display:flex; justify-content:center; }
+  .widget{
+    width:330px;
+    max-width:100%;
+    background:rgba(23,25,31,0.94);
+    border:1px solid var(--border-2);
+    border-radius:22px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,0.6);
+    transition:box-shadow 300ms ease;
+  }
+  .widget[data-state="blocking"]{
+    box-shadow:0 0 0 1px var(--accent-blocking), 0 24px 60px -20px rgba(0,0,0,0.6);
+    animation:pulseRing 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseRing{
+    0%,100%{ box-shadow:0 0 0 1px var(--accent-blocking), 0 24px 60px -20px rgba(0,0,0,0.6); }
+    50%{ box-shadow:0 0 0 3px var(--accent-blocking), 0 24px 70px -16px rgba(0,0,0,0.7); }
+  }
+
+  .sprite-row{ display:flex; align-items:center; gap:14px; }
+  .sprite-frame{
+    width:88px; height:88px; flex:none;
+    background:var(--panel-2);
+    border-radius:16px;
+    display:grid;
+    place-items:center;
+    border:1px solid var(--border);
+  }
+  .sprite{
+    width:64px; height:64px;
+    display:grid;
+    grid-template-columns:repeat(16,1fr);
+    grid-template-rows:repeat(16,1fr);
+  }
+  .sprite div{ width:100%; height:100%; }
+
+  .status-col{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .status-line{ display:flex; align-items:center; gap:7px; }
+  .status-dot{ font-size:11px; line-height:1; }
+  .status-text{ font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .state-label{
+    font-family:'Press Start 2P',monospace;
+    font-size:9px;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+  }
+
+  .input-row{
+    display:flex; align-items:center; gap:8px;
+    background:transparent;
+    border-top:1px solid var(--border);
+    padding-top:10px;
+  }
+  .fake-input{
+    flex:1;
+    font-size:13px;
+    color:var(--text-faint);
+  }
+  .send-btn{
+    width:30px; height:30px; border-radius:999px; flex:none;
+    background:#3a3d46;
+    display:grid; place-items:center;
+    color:#fff; font-size:12px;
+  }
+
+  /* --- controls --- */
+  .controls{ display:flex; flex-direction:column; gap:14px; }
+  .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  button.state-btn{
+    font-family:inherit;
+    font-size:13px;
+    color:var(--text-dim);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:9px 14px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:7px;
+    transition:border-color 150ms ease, color 150ms ease, background 150ms ease;
+  }
+  button.state-btn:hover{ border-color:var(--border-2); color:var(--text); }
+  button.state-btn[data-active="true"]{
+    color:var(--text);
+    background:var(--panel-2);
+    border-color:var(--dot-color,var(--border-2));
+  }
+  button.state-btn .swatch{
+    width:8px; height:8px; border-radius:999px;
+    background:var(--dot-color,var(--text-faint));
+  }
+
+  .auto-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-faint); }
+  .auto-row button{
+    font-family:inherit; font-size:12px; color:var(--text-dim);
+    background:none; border:1px solid var(--border); border-radius:8px;
+    padding:5px 10px; cursor:pointer;
+  }
+  .auto-row button[data-on="true"]{ color:var(--accent-working); border-color:var(--accent-working); }
+
+  /* --- legend --- */
+  .legend{ display:flex; flex-direction:column; gap:10px; }
+  .legend h2{ margin:0; font-size:13px; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; }
+  .legend-table{ display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .legend-row{
+    display:grid;
+    grid-template-columns:96px 1fr auto;
+    gap:12px;
+    align-items:center;
+    padding:10px 14px;
+    background:var(--panel);
+    font-size:12.5px;
+  }
+  .legend-row+.legend-row{ border-top:1px solid var(--border); }
+  .legend-state{ display:flex; align-items:center; gap:7px; font-weight:600; }
+  .legend-state .swatch{ width:8px; height:8px; border-radius:999px; }
+  .legend-frames{ color:var(--text-faint); font-variant-numeric:tabular-nums; }
+  .legend-trigger{ color:var(--text-dim); text-align:right; }
+
+  @media (max-width:420px){
+    .legend-row{ grid-template-columns:1fr; }
+    .legend-trigger{ text-align:left; }
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap">
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">PET-ICON · SPRITE TEST</div>
+    <h1>Pixel Buddy — стани пета</h1>
+    <p class="desc">
+      Тестовий спрайт для <code>pet-icon.ps1</code>: 16×16 піксель-грід (палітра індексів, без PNG),
+      зіставлений на 4 стани віджета. Клікай кнопки нижче або дай авто-циклу пройти всі стани.
+    </p>
+    <p class="credit">
+      Спрайт «Pixel Buddy» з <a href="https://github.com/TeXmeijin/claude-code-mascot-statusline" target="_blank" rel="noopener">claude-code-mascot-statusline</a> · MIT License
+    </p>
+  </header>
+
+  <div class="stage">
+    <div class="widget" id="widget" data-state="idle">
+      <div class="sprite-row">
+        <div class="sprite-frame">
+          <div class="sprite" id="sprite"></div>
+        </div>
+        <div class="status-col">
+          <div class="state-label" id="stateLabel" style="color:var(--accent-idle)">IDLE</div>
+          <div class="status-line">
+            <span class="status-dot" id="statusDot">●</span>
+            <span class="status-text" id="statusText">waiting for prompt</span>
+          </div>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="fake-input">Send prompt (no window)...</div>
+        <div class="send-btn">&#10148;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="btn-row" id="btnRow"></div>
+    <div class="auto-row">
+      <button id="autoBtn" data-on="true">auto-cycle: on</button>
+      <span id="autoHint">перемикається кожні 4с</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h2>Мапінг стан → кадри джерела</h2>
+    <div class="legend-table" id="legendTable"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var PALETTE = [null,"#4b556a","#f5d08b","#eaa4bb","#f8fafc","#63d2a1","#f3c969","#7db8ff","#ff7a70","#a0522d","#484858","#333333"];
+
+  var FRAMES = {
+    idle_1:[[0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,1,2,2,2,2,2,2,1,1,2,9,9],[0,1,2,2,2,2,1,3,3,1,2,2,2,2,1,0],[0,9,9,2,2,2,2,1,1,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    idle_2:[[0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,0,2,2,2,2,2,2,0,1,2,9,9],[0,1,2,2,2,2,1,3,3,1,2,2,2,2,1,0],[0,9,9,2,2,2,2,1,1,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    tool_1:[[0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,2,1,1,2,2,2,2,1,1,2,2,1,1],[7,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[9,9,2,0,1,2,2,2,2,2,2,1,0,2,9,9],[7,1,2,2,2,2,1,3,3,1,2,2,2,2,1,0],[0,9,9,2,2,2,2,2,2,2,2,2,2,9,9,0],[7,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,2,2,1,1,1,1,2,2,1,0,0,0],[0,0,1,2,1,0,0,0,0,0,0,1,2,1,0,0],[1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    tool_2:[[0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[7,1,2,2,1,1,2,2,2,2,1,1,2,2,1,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[7,9,2,0,1,2,2,2,2,2,2,1,0,2,9,9],[0,1,2,2,2,2,1,3,3,1,2,2,2,2,1,0],[7,9,9,2,2,2,2,2,2,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[7,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,0,1,2,1,1,1,1,2,1,0,0,0,0],[0,0,0,1,2,1,0,0,0,0,1,2,1,0,0,0],[0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    done_1:[[5,5,1,1,0,0,0,0,0,0,0,0,1,1,5,5],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,0,2,2,2,2,2,2,0,1,2,9,9],[0,1,2,2,2,5,1,3,3,1,5,2,2,2,1,0],[0,9,9,2,2,2,2,1,1,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    done_2:[[5,5,1,1,0,0,0,0,0,0,0,0,1,1,5,5],[5,5,3,2,1,0,0,0,0,0,0,1,2,3,5,5],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,0,2,2,2,2,2,2,0,1,2,9,9],[0,1,2,2,2,5,1,3,3,1,5,2,2,2,1,0],[0,9,9,2,2,2,2,1,1,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,5,2,1,1,2,5,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    permission_1:[[8,8,1,1,0,0,0,0,0,0,0,0,1,1,8,8],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,8,2,2,2,2,2,2,8,1,2,9,9],[0,1,2,2,2,2,1,3,3,1,2,2,2,2,1,0],[0,8,8,2,2,2,2,1,1,2,2,2,2,8,8,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+    fail_1:[[0,0,1,1,0,0,0,8,8,0,0,0,1,1,0,0],[0,1,3,2,1,0,0,0,0,0,0,1,2,3,1,0],[1,2,3,2,2,2,2,2,2,2,2,2,2,3,2,1],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0],[1,1,2,1,1,2,2,2,2,2,2,1,1,2,1,1],[1,1,2,1,4,2,2,2,2,2,2,4,1,2,1,1],[9,9,2,1,1,7,2,2,2,2,2,1,1,2,9,9],[0,1,2,2,2,2,2,1,1,2,2,2,2,2,1,0],[0,9,9,2,2,2,2,1,1,2,2,2,2,9,9,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],[0,0,1,1,2,2,2,2,2,2,2,2,1,1,0,0],[0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]
+  };
+
+  var STATES = {
+    idle:      { label:"IDLE",      frames:["idle_1","idle_2"],           frameMs:900,  accent:"--accent-idle",      dot:"●", text:"waiting for prompt" },
+    working:   { label:"WORKING",   frames:["tool_1","tool_2"],           frameMs:180,  accent:"--accent-working",   dot:"●", text:"running: Edit pet-icon.ps1" },
+    done:      { label:"DONE",      frames:["done_1","done_2"],           frameMs:450,  accent:"--accent-done",      dot:"✓", text:"done · 2.4s · $0.012" },
+    blocking:  { label:"BLOCKING",  frames:["permission_1","fail_1"],     frameMs:1400, accent:"--accent-blocking",  dot:"▲", text:"needs approval — click to open" }
+  };
+  var ORDER = ["idle","working","done","blocking"];
+
+  var LEGEND_ROWS = [
+    { key:"idle",     src:"idle_1, idle_2",             trig:"немає активної job" },
+    { key:"working",  src:"tool_1, tool_2 ← tool_running", trig:"job.State = run" },
+    { key:"done",     src:"done_1, done_2",             trig:"job.State = done" },
+    { key:"blocking", src:"permission_1 / fail_1",      trig:"job.State = approve / error" }
+  ];
+
+  var spriteEl = document.getElementById("sprite");
+  var cells = [];
+  for (var i = 0; i < 256; i++) {
+    var d = document.createElement("div");
+    spriteEl.appendChild(d);
+    cells.push(d);
+  }
+
+  function drawFrame(name) {
+    var grid = FRAMES[name];
+    var idx = 0;
+    for (var r = 0; r < 16; r++) {
+      for (var c = 0; c < 16; c++) {
+        var v = grid[r][c];
+        var color = PALETTE[v];
+        cells[idx].style.background = color ? color : "transparent";
+        idx++;
+      }
+    }
+  }
+
+  var widget = document.getElementById("widget");
+  var stateLabel = document.getElementById("stateLabel");
+  var statusDot = document.getElementById("statusDot");
+  var statusText = document.getElementById("statusText");
+
+  var current = "idle";
+  var frameIdx = 0;
+  var frameTimer = null;
+
+  function applyState(key) {
+    current = key;
+    frameIdx = 0;
+    var def = STATES[key];
+    widget.setAttribute("data-state", key);
+    stateLabel.textContent = def.label;
+    stateLabel.style.color = "var(" + def.accent + ")";
+    statusDot.textContent = def.dot;
+    statusDot.style.color = "var(" + def.accent + ")";
+    statusText.textContent = def.text;
+    drawFrame(def.frames[0]);
+
+    if (frameTimer) clearInterval(frameTimer);
+    if (def.frames.length > 1) {
+      frameTimer = setInterval(function () {
+        frameIdx = (frameIdx + 1) % def.frames.length;
+        drawFrame(def.frames[frameIdx]);
+      }, def.frameMs);
+    }
+
+    ORDER.forEach(function (k) {
+      var btn = document.getElementById("btn-" + k);
+      btn.setAttribute("data-active", k === key ? "true" : "false");
+    });
+  }
+
+  var btnRow = document.getElementById("btnRow");
+  ORDER.forEach(function (key) {
+    var def = STATES[key];
+    var btn = document.createElement("button");
+    btn.className = "state-btn";
+    btn.id = "btn-" + key;
+    btn.style.setProperty("--dot-color", "var(" + def.accent + ")");
+    var sw = document.createElement("span");
+    sw.className = "swatch";
+    btn.appendChild(sw);
+    btn.appendChild(document.createTextNode(def.label.charAt(0) + def.label.slice(1).toLowerCase()));
+    btn.addEventListener("click", function () {
+      applyState(key);
+      pauseAuto();
+    });
+    btnRow.appendChild(btn);
+  });
+
+  var legendTable = document.getElementById("legendTable");
+  LEGEND_ROWS.forEach(function (row) {
+    var def = STATES[row.key];
+    var el = document.createElement("div");
+    el.className = "legend-row";
+    el.innerHTML =
+      '<div class="legend-state"><span class="swatch" style="background:var(' + def.accent + ')"></span>' + def.label + '</div>' +
+      '<div class="legend-frames">' + row.src + '</div>' +
+      '<div class="legend-trigger">' + row.trig + '</div>';
+    legendTable.appendChild(el);
+  });
+
+  var autoOn = true;
+  var autoInterval = null;
+  var autoResumeTimer = null;
+
+  function startAuto() {
+    if (autoInterval) clearInterval(autoInterval);
+    autoInterval = setInterval(function () {
+      var next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+      applyState(next);
+    }, 4000);
+  }
+
+  function stopAuto() {
+    if (autoInterval) clearInterval(autoInterval);
+    autoInterval = null;
+  }
+
+  function pauseAuto() {
+    if (!autoOn) return;
+    stopAuto();
+    if (autoResumeTimer) clearTimeout(autoResumeTimer);
+    autoResumeTimer = setTimeout(startAuto, 12000);
+  }
+
+  var autoBtn = document.getElementById("autoBtn");
+  var autoHint = document.getElementById("autoHint");
+  autoBtn.addEventListener("click", function () {
+    autoOn = !autoOn;
+    autoBtn.setAttribute("data-on", autoOn ? "true" : "false");
+    autoBtn.textContent = "auto-cycle: " + (autoOn ? "on" : "off");
+    autoHint.textContent = autoOn ? "перемикається кожні 4с" : "натисни кнопку, щоб перемкнути вручну";
+    if (autoOn) { startAuto(); } else { stopAuto(); if (autoResumeTimer) clearTimeout(autoResumeTimer); }
+  });
+
+  applyState("idle");
+  startAuto();
+})();
+</script>
