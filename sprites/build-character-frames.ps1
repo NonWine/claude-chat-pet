@@ -260,11 +260,18 @@ foreach ($p in $mapping.states.PSObject.Properties) {
     $ms = if ($def.frameMs -is [array]) { @($def.frameMs | ForEach-Object { [int]$_ }) }
           else { [int]$def.frameMs }
 
-    $manifestStates[$state] = [ordered]@{
+    $entry = [ordered]@{
         frameMs = $ms
         loop    = [bool]$def.loop
         frames  = $i
     }
+    # 'pick' turns the timeline into something other than file 1..N in order, and 'group'
+    # says which states may cross-fade into each other. Both pass straight through: the
+    # numbers in 'pick' are positions in this state's own frames list, and that list is
+    # written out as 01..NN in the same order, so they already line up.
+    if ($null -ne $def.pick)  { $entry.pick  = $def.pick }
+    if ($def.group)           { $entry.group = [string]$def.group }
+    $manifestStates[$state] = $entry
     Write-Output ("wrote    {0,-9} {1} frame(s)" -f $state, $i)
 }
 
@@ -277,6 +284,16 @@ $manifest = [ordered]@{
     displayHeight = $dispH
     pixelArt      = $false
     states        = $manifestStates
+}
+if ($null -ne $mapping.crossfadeMs) { $manifest.crossfadeMs = [int]$mapping.crossfadeMs }
+if ($null -ne $mapping.breathe) {
+    # Breathing amplitude is a property of how big and how human the art is, so it is
+    # authored next to the art rather than in the widget.
+    $manifest.breathe = [ordered]@{
+        scaleY   = [double]$mapping.breathe.scaleY
+        scaleX   = [double]$mapping.breathe.scaleX
+        periodMs = [int]$mapping.breathe.periodMs
+    }
 }
 
 $manifestPath = Join-Path $OutDir "manifest.json"

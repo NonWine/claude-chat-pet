@@ -299,6 +299,13 @@ try {
           <BlurEffect Radius="7"/>
         </Ellipse.Effect>
       </Ellipse>
+      <!-- The outgoing frame during a cross-fade. It must sit BELOW PetImage and match its
+           box exactly, otherwise the transition slides. Invisible and untouchable unless a
+           fade is running, and unused entirely when the manifest sets no crossfadeMs. -->
+      <Image x:Name="PetFade" Width="44" Height="44" Opacity="0" IsHitTestVisible="False"
+             VerticalAlignment="Bottom" Margin="0,0,0,4"
+             RenderOptions.BitmapScalingMode="NearestNeighbor"
+             RenderTransformOrigin="0.5,1.0"/>
       <!-- Size and scaling filter here are the FALLBACK only: a manifest carrying
            displayHeight overrides both, so art of any size needs no edit in this file. -->
       <Image x:Name="PetImage" Width="44" Height="44"
@@ -318,6 +325,7 @@ try {
     $root        = $window.FindName("Root")
     $petHost     = $window.FindName("PetHost")
     $petImage    = $window.FindName("PetImage")
+    $petFade     = $window.FindName("PetFade")
     $petGlow     = $window.FindName("PetGlow")
     $panel       = $window.FindName("Panel")
     $panelWrap   = $window.FindName("PanelWrap")
@@ -399,7 +407,7 @@ try {
     . "$PSScriptRoot\pet-sprite.ps1"
     $framesDir = [string]$cfg.framesDir
     if (-not [IO.Path]::IsPathRooted($framesDir)) { $framesDir = Join-Path $PSScriptRoot $framesDir }
-    $pet = New-PetSprite -Image $petImage -FramesDir $framesDir
+    $pet = New-PetSprite -Image $petImage -FadeImage $petFade -FramesDir $framesDir
 
     # The art decides how big its own box is. The Width/Height in the XAML above are only the
     # fallback for a manifest with no displayHeight; when there is one, everything that wraps
@@ -431,17 +439,22 @@ try {
     }
 
     # Breathing, anchored at the feet, so an idle pet still looks alive.
+    #
+    # The amplitude belongs to the ART, not to this file. The old hardcoded 1.05 is one pixel
+    # of squash on a 16px cat and seven on a 150px human figure, where it stops reading as
+    # breathing and starts reading as inflating. The manifest carries it; the defaults in
+    # pet-sprite.ps1 are these exact numbers, so the placeholder is untouched.
     $petScale = New-Object System.Windows.Media.ScaleTransform(1, 1)
     $petImage.RenderTransform = $petScale
     function Start-PetBreathing {
         foreach ($p in @(
-            @{ prop = [System.Windows.Media.ScaleTransform]::ScaleYProperty; to = 1.05 },
-            @{ prop = [System.Windows.Media.ScaleTransform]::ScaleXProperty; to = 0.975 }
+            @{ prop = [System.Windows.Media.ScaleTransform]::ScaleYProperty; to = $pet.Breathe.ScaleY },
+            @{ prop = [System.Windows.Media.ScaleTransform]::ScaleXProperty; to = $pet.Breathe.ScaleX }
         )) {
             $a = New-Object System.Windows.Media.Animation.DoubleAnimation
             $a.From = 1.0
             $a.To = $p.to
-            $a.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1300))
+            $a.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($pet.Breathe.PeriodMs))
             $a.AutoReverse = $true
             $a.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
             $ease = New-Object System.Windows.Media.Animation.CubicEase

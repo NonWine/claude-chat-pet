@@ -6,35 +6,49 @@
   "supersample": 2,
   "overlayOffset": [0, 0],
   "anchor": "center-top",
+  "crossfadeMs": 140,
+
+  "breathe": { "scaleY": 1.012, "scaleX": 0.997, "periodMs": 2600 },
 
   "_check_first": "Overlay two poses at 1:1 and compare the HEADS before writing any of this. Same size means the poses share a scale and can be mixed. Different size means the source draws that pose at another zoom, no alignment can fix it, and only one pose family may be used.",
+  "_breathe": "Amplitude is a property of the art, not the widget. The old hardcoded 1.05 is one pixel of squash on a 16px sprite and seven on a 150px human figure, where it reads as inflating rather than breathing. periodMs is the HALF cycle - the animation auto-reverses - so 2600 is about 11 breaths a minute.",
+  "_group": "Two states with the same group may cross-fade into each other; different groups hard-cut. Group by BODY POSE: dissolving arms-down into arms-crossed is a four-armed ghost, not a transition. A state with no group never fades.",
+  "_pick": "Optional, and it decouples the timeline from the file list. One entry per STEP, each listing which file numbers (1-based, in this state's own frames order) may appear at that step. The renderer never picks the same one twice running. Without it a state holds one identical face for ever, which is the tell that it is a loop rather than a character. Note frameMs is then measured in steps, not files.",
   "_still": "A state may be one frame with frameMs 0 and it will sit still, which is legal and sometimes right. Beware next to a blinking idle: the character appears to freeze the instant that state is entered. Give even the momentary states a blink.",
   "_nudge": "Any state may add \"nudge\": [dx, dy] in source pixels to shift that pose inside the register canvas.",
 
   "states": {
-    "idle":     { "frameMs": [2600, 110, 180, 110], "loop": true,  "frames": [
-                    { "body": "body_stand.png", "overlay": "face/eyes_open.png" },
-                    { "body": "body_stand.png", "overlay": "face/eyes_half.png" },
+    "idle":     { "frameMs": [3000, 130], "loop": true, "group": "rest",
+                  "pick": [[1, 3, 4], [2]],
+                  "frames": [
+                    { "body": "body_stand.png", "overlay": "face/neutral.png" },
                     { "body": "body_stand.png", "overlay": "face/eyes_shut.png" },
-                    { "body": "body_stand.png", "overlay": "face/eyes_half.png" } ] },
-    "hover":    { "frameMs": [2800, 130], "loop": true, "frames": [
+                    { "body": "body_stand.png", "overlay": "face/calm_a.png" },
+                    { "body": "body_stand.png", "overlay": "face/calm_b.png" } ] },
+
+    "hover":    { "frameMs": [2800, 130], "loop": true, "group": "rest", "frames": [
                     { "body": "body_stand.png", "overlay": "face/look.png" },
                     { "body": "body_stand.png", "overlay": "face/eyes_shut.png" } ] },
-    "input":    { "frameMs": [3200, 130], "loop": true, "frames": [
-                    { "body": "body_lean.png",  "overlay": "face/attentive.png" },
-                    { "body": "body_lean.png",  "overlay": "face/eyes_shut.png" } ] },
-    "working":  { "frameMs": 220,  "loop": true,  "frames": [
-                    { "body": "body_work.png",  "overlay": "face/focused_a.png" },
-                    { "body": "body_work.png",  "overlay": "face/focused_b.png" } ] },
-    "thinking": { "frameMs": [520, 340, 340], "loop": true,  "frames": [
-                    { "body": "body_think.png", "overlay": "face/think_a.png" },
-                    { "body": "body_think.png", "overlay": "face/think_b.png" },
-                    { "body": "body_think.png", "overlay": "face/think_c.png" } ] },
-    "done":     { "frameMs": 450,  "loop": true,  "frames": [
-                    { "body": "body_stand.png", "overlay": "face/smile_a.png" },
-                    { "body": "body_stand.png", "overlay": "face/smile_b.png" } ] },
-    "blocking": { "frameMs": 1400, "loop": true,  "frames": [
-                    { "body": "body_stand.png", "overlay": "face/puzzled.png" },
-                    { "body": "body_stand.png", "overlay": "face/annoyed.png" } ] }
+
+    "input":    { "frameMs": [3200, 130], "loop": true, "group": "rest", "frames": [
+                    { "body": "body_stand.png", "overlay": "face/attentive.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_shut.png" } ] },
+
+    "thinking": { "frameMs": [1300, 170, 1100], "loop": true, "group": "rest", "frames": [
+                    { "body": "body_stand.png", "overlay": "face/think_a.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_shut.png" },
+                    { "body": "body_stand.png", "overlay": "face/think_b.png" } ] },
+
+    "working":  { "frameMs": [2200, 120], "loop": true, "group": "busy", "frames": [
+                    { "body": "body_work.png", "overlay": "face/focused.png" },
+                    { "body": "body_work.png", "overlay": "face/eyes_shut.png" } ] },
+
+    "done":     { "frameMs": [1800, 140], "loop": true, "group": "busy", "frames": [
+                    { "body": "body_work.png", "overlay": "face/smile.png" },
+                    { "body": "body_work.png", "overlay": "face/eyes_shut.png" } ] },
+
+    "blocking": { "frameMs": [1700, 130], "loop": true, "group": "busy", "frames": [
+                    { "body": "body_work.png", "overlay": "face/puzzled.png" },
+                    { "body": "body_work.png", "overlay": "face/eyes_shut.png" } ] }
   }
 }

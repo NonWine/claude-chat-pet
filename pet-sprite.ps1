@@ -5,25 +5,43 @@
 #     $pet.SetState('working')
 #
 # The only contract with the art is the folder: sprites\frames\<state>\NN.png plus a
-# manifest.json giving frameMs / loop / frames per state, where frameMs is one number for
-# the state or an array of one number per frame. Swapping the character means
-# dropping different PNGs in - nothing here changes.
+# manifest.json. Swapping the character means dropping different PNGs in - nothing here
+# changes. Everything the manifest may say beyond frames/frameMs/loop is OPTIONAL, and a
+# manifest written before a field existed keeps rendering exactly as it did.
 #
-# The manifest may also carry two OPTIONAL presentation hints, so that swapping a 16px pixel
-# cat for a 150px anime portrait needs no code edit either:
+# Per state:
+#     frames    : how many PNG FILES the state has.
+#     frameMs   : one number for the state, or one per TIMELINE step (see pick).
+#     loop      : whether the timeline repeats.
+#     pick      : optional. Turns the timeline into something other than "play file 1..N in
+#                 order": one entry per step, each listing the file numbers allowed at that
+#                 step. The renderer chooses among them, never the same twice running. This
+#                 is what keeps an idle loop from reading as a machine - a human at rest
+#                 does not hold one identical expression for ever.
+#     group     : optional. Two states in the same group may cross-fade into each other.
+#                 States in different groups hard-cut, because a fade between two different
+#                 body poses is a four-armed ghost, not a transition.
+#
+# Whole-manifest:
 #     displayHeight : how tall the character renders, in DIP. Width follows the art's aspect.
 #     pixelArt      : true -> NearestNeighbor, false -> HighQuality.
-# Omit them and the caller's XAML decides, exactly as before they existed.
+#     crossfadeMs   : 0 (default) hard-cuts every state change, as it always did.
+#     breathe       : { scaleY, scaleX, periodMs } for the caller's idle animation. Amplitude
+#                     HAS to come from the art: 5% of a 16px cat is one pixel of squash, 5%
+#                     of a 150px human figure is the character inflating.
 #
-# Frames stay at their native resolution; the caller decides display size and should set
-# RenderOptions.BitmapScalingMode="NearestNeighbor" on the Image so pixel art stays crisp.
+# Frames stay at their native resolution; the caller decides display size.
 #
 # NOTE: this file must stay pure ASCII (PowerShell 5.1 reads a BOM-less script as ANSI).
 
 function New-PetSprite {
     param(
         [Parameter(Mandatory = $true)] $Image,
-        [Parameter(Mandatory = $true)] [string] $FramesDir
+        [Parameter(Mandatory = $true)] [string] $FramesDir,
+
+        # A second Image stacked UNDER $Image, used only to cross-fade. Omit it and every
+        # state change hard-cuts, which is what callers that never had one still get.
+        $FadeImage = $null
     )
 
     $manifestPath = Join-Path $FramesDir "manifest.json"
@@ -51,14 +69,39 @@ function New-PetSprite {
         }
         if ($imgs.Count -eq 0) { continue }
 
-        # frameMs is EITHER one number for the whole state OR one number per frame. The
-        # per-frame form exists for blinks: an even two-frame loop on a human face reads as
-        # falling asleep, while 2600ms open + 120ms shut reads as alive. A scalar is just the
+        # ------------------------------------------------------------- timeline
+        # Files and timeline steps are NOT the same count once 'pick' is in play: four
+        # expression files can drive a two-step loop. Without pick the two collapse to the
+        # old one-file-per-step timeline, so nothing about an existing manifest moves.
+        $pick = New-Object System.Collections.ArrayList
+        if ($null -ne $def.pick -and $def.pick -is [array] -and $def.pick.Count -gt 0) {
+            foreach ($step in $def.pick) {
+                $opts = New-Object System.Collections.ArrayList
+                foreach ($n in @($step)) {
+                    $k = [int]$n - 1          # manifest is 1-based, like the file names
+                    if ($k -ge 0 -and $k -lt $imgs.Count) { [void]$opts.Add($k) }
+                }
+                if ($opts.Count -eq 0) { [void]$opts.Add(0) }
+                [void]$pick.Add($opts)
+            }
+        }
+        else {
+            for ($i = 0; $i -lt $imgs.Count; $i++) {
+                $opts = New-Object System.Collections.ArrayList
+                [void]$opts.Add($i)
+                [void]$pick.Add($opts)
+            }
+        }
+        $steps = $pick.Count
+
+        # frameMs is EITHER one number for the whole state OR one number per timeline step.
+        # The per-step form exists for blinks: an even two-step loop on a human face reads as
+        # falling asleep, while 3000ms open + 130ms shut reads as alive. A scalar is just the
         # even case, so both are normalised to the same array and there is one code path.
-        $durs = [int[]]::new($imgs.Count)
+        $durs = [int[]]::new($steps)
         if ($def.frameMs -is [array]) {
             $given = $def.frameMs
-            for ($i = 0; $i -lt $imgs.Count; $i++) {
+            for ($i = 0; $i -lt $steps; $i++) {
                 # A short array holds its last value instead of falling to 0, which would
                 # otherwise run the rest of the state at the timer floor.
                 $k = if ($i -lt $given.Count) { $i } else { $given.Count - 1 }
@@ -66,14 +109,14 @@ function New-PetSprite {
             }
         }
         else {
-            for ($i = 0; $i -lt $imgs.Count; $i++) { $durs[$i] = [int]$def.frameMs }
+            for ($i = 0; $i -lt $steps; $i++) { $durs[$i] = [int]$def.frameMs }
         }
 
-        # A state animates only if it has somewhere to advance to and a real duration -
-        # 'hover' and 'input' are single stills with frameMs 0 and must stay that way.
+        # A state animates only if it has somewhere to advance to and a real duration. A
+        # one-step state is a still, whatever its frameMs says.
         $maxDur = 0
         foreach ($d in $durs) { if ($d -gt $maxDur) { $maxDur = $d } }
-        $animated = ($imgs.Count -gt 1 -and $maxDur -gt 0)
+        $animated = ($steps -gt 1 -and $maxDur -gt 0)
 
         # Once it does animate, every step is floored: a stray 0 inside an array must not
         # become a zero-interval DispatcherTimer.
@@ -81,11 +124,17 @@ function New-PetSprite {
             for ($i = 0; $i -lt $durs.Count; $i++) { if ($durs[$i] -lt 16) { $durs[$i] = 16 } }
         }
 
+        $last = [int[]]::new($steps)
+        for ($i = 0; $i -lt $steps; $i++) { $last[$i] = -1 }
+
         $states[$name] = @{
             Frames    = $imgs
+            Pick      = $pick
+            LastPick  = $last
             Durations = $durs
             Animated  = $animated
             Loop      = [bool]$def.loop
+            Group     = [string]$def.group
         }
     }
 
@@ -96,12 +145,10 @@ function New-PetSprite {
     # the widget: a 16px cat and a 150px anime portrait need different display boxes and
     # opposite scaling filters. Reading them from the manifest keeps the promise that swapping
     # the character means swapping files.
-    #
-    # Both fields are OPTIONAL. Absent -> nothing is touched and the caller's XAML wins, so a
-    # manifest written before these existed renders exactly as it did.
     $dispH = 0.0
     $dispW = 0.0
     $names = $manifest.PSObject.Properties.Name
+    $layers = @($Image, $FadeImage) | Where-Object { $null -ne $_ }
 
     if ($names -contains 'displayHeight' -and [double]$manifest.displayHeight -gt 0) {
         $dispH = [double]$manifest.displayHeight
@@ -113,8 +160,7 @@ function New-PetSprite {
         else { foreach ($k in $states.Keys) { $ref = $states[$k].Frames[0]; break } }
 
         $dispW = [Math]::Round($dispH * $ref.PixelWidth / $ref.PixelHeight, 0)
-        $Image.Height = $dispH
-        $Image.Width  = $dispW
+        foreach ($l in $layers) { $l.Height = $dispH; $l.Width = $dispW }
     }
 
     if ($names -contains 'pixelArt') {
@@ -123,15 +169,33 @@ function New-PetSprite {
         } else {
             [System.Windows.Media.BitmapScalingMode]::HighQuality
         }
-        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($Image, $smode)
+        foreach ($l in $layers) { [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($l, $smode) }
+    }
+
+    $fadeMs = 0
+    if ($names -contains 'crossfadeMs') { $fadeMs = [int]$manifest.crossfadeMs }
+    if ($null -eq $FadeImage) { $fadeMs = 0 }
+
+    # Defaults are the values the widget hardcoded before this was a manifest field, so the
+    # placeholder breathes exactly as it always has.
+    $breathe = @{ ScaleY = 1.05; ScaleX = 0.975; PeriodMs = 1300 }
+    if ($names -contains 'breathe' -and $null -ne $manifest.breathe) {
+        $b = $manifest.breathe
+        if ($null -ne $b.scaleY)   { $breathe.ScaleY   = [double]$b.scaleY }
+        if ($null -ne $b.scaleX)   { $breathe.ScaleX   = [double]$b.scaleX }
+        if ($null -ne $b.periodMs) { $breathe.PeriodMs = [int]$b.periodMs }
     }
 
     $sprite = [pscustomobject]@{
-        Image   = $Image
-        States  = $states
-        Current = $null
-        Frame   = 0
-        Timer   = (New-Object System.Windows.Threading.DispatcherTimer)
+        Image     = $Image
+        FadeImage = $FadeImage
+        States    = $states
+        Current   = $null
+        Frame     = 0          # timeline step, not file index
+        FadeMs    = $fadeMs
+        Breathe   = $breathe
+
+        Timer = (New-Object System.Windows.Threading.DispatcherTimer)
 
         # 0 when the manifest gave no hint. The caller uses these to size whatever sits
         # around the character (hit area, shadow) instead of hardcoding the art's size too.
@@ -139,19 +203,35 @@ function New-PetSprite {
         DisplayHeight = $dispH
     }
 
+    # Which file to show at a timeline step. With one option this is the plain old
+    # behaviour; with several it avoids repeating the previous choice, because a random
+    # walk that lands on the same expression three cycles running looks like a bug.
+    Add-Member -InputObject $sprite -MemberType ScriptMethod -Name PickFrame -Value {
+        param($State, [int]$Step)
+        $opts = $State.Pick[$Step]
+        if ($opts.Count -eq 1) { return $opts[0] }
+        $chosen = $opts[0]
+        for ($try = 0; $try -lt 8; $try++) {
+            $chosen = $opts[(Get-Random -Minimum 0 -Maximum $opts.Count)]
+            if ($chosen -ne $State.LastPick[$Step]) { break }
+        }
+        $State.LastPick[$Step] = $chosen
+        return $chosen
+    }
+
     $sprite.Timer.Add_Tick({
         try {
             $s = $sprite.States[$sprite.Current]
             if ($null -eq $s -or -not $s.Animated) { return }
             $next = $sprite.Frame + 1
-            if ($next -ge $s.Frames.Count) {
+            if ($next -ge $s.Pick.Count) {
                 if (-not $s.Loop) { $sprite.Timer.Stop(); return }
                 $next = 0
             }
             $sprite.Frame = $next
-            $sprite.Image.Source = $s.Frames[$next]
+            $sprite.Image.Source = $s.Frames[$sprite.PickFrame($s, $next)]
 
-            # Every frame carries its own dwell time, so the timer is re-armed for the frame
+            # Every step carries its own dwell time, so the timer is re-armed for the step
             # just shown. Assigning Interval on a running DispatcherTimer restarts its
             # countdown, which is exactly the variable-rate behaviour wanted here.
             $sprite.Timer.Interval = [TimeSpan]::FromMilliseconds($s.Durations[$next])
@@ -164,10 +244,20 @@ function New-PetSprite {
         if ([string]::IsNullOrEmpty($Name) -or -not $this.States.ContainsKey($Name)) { $Name = 'idle' }
         if ($this.Current -eq $Name) { return }
 
-        $s = $this.States[$Name]
+        $s    = $this.States[$Name]
+        $prev = if ($null -ne $this.Current) { $this.States[$this.Current] } else { $null }
+        $was  = $this.Image.Source
+
+        # Fade only between states that declared the same group. Across groups the art is a
+        # different body pose, and dissolving one into the other shows both sets of arms.
+        $fade = ($this.FadeMs -gt 0 -and $null -ne $was -and $null -ne $prev -and
+                 -not [string]::IsNullOrEmpty($prev.Group) -and $prev.Group -eq $s.Group)
+
         $this.Current = $Name
         $this.Frame = 0
-        $this.Image.Source = $s.Frames[0]
+        $this.Image.Source = $s.Frames[$this.PickFrame($s, 0)]
+
+        if ($fade) { $this.BeginFade($was) }
 
         $this.Timer.Stop()
         if ($s.Animated) {
@@ -176,8 +266,40 @@ function New-PetSprite {
         }
     }
 
+    # The outgoing frame sits underneath at full opacity while the incoming one fades in over
+    # it. Fading BOTH would let the desktop show through the character mid-transition.
+    Add-Member -InputObject $sprite -MemberType ScriptMethod -Name BeginFade -Value {
+        param($PrevBitmap)
+        $fi  = $this.FadeImage
+        $img = $this.Image
+        $fi.Source = $PrevBitmap
+        $fi.Opacity = 1
+
+        $a = New-Object System.Windows.Media.Animation.DoubleAnimation
+        $a.From = 0.0
+        $a.To = 1.0
+        $a.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($this.FadeMs))
+        $ease = New-Object System.Windows.Media.Animation.CubicEase
+        $ease.EasingMode = "EaseInOut"
+        $a.EasingFunction = $ease
+        $a.Add_Completed({
+            # Releasing the animation matters: while one is attached it overrides the local
+            # value, so a later plain assignment to Opacity would silently do nothing.
+            try {
+                $img.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                $img.Opacity = 1
+                $fi.Opacity = 0
+                $fi.Source = $null
+            } catch { }
+        }.GetNewClosure())
+        $img.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $a)
+    }
+
     Add-Member -InputObject $sprite -MemberType ScriptMethod -Name Stop -Value {
         try { $this.Timer.Stop() } catch { }
+        try {
+            if ($null -ne $this.FadeImage) { $this.FadeImage.Opacity = 0; $this.FadeImage.Source = $null }
+        } catch { }
     }
 
     return $sprite
