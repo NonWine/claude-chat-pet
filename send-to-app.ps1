@@ -2,6 +2,7 @@
 # Runs as a separate hidden process so the widget UI never blocks.
 param(
     [Parameter(Mandatory = $true)][string]$TextFile,
+    [string]$Folder = "",
     [int]$SettleMs = 1400,
     [switch]$NoSend
 )
@@ -36,7 +37,13 @@ public static class FgWin {
 }
 "@
 
-    Start-Process "claude://code/new"
+    # ?folder= decides which project the new chat runs in. Without it the app reuses
+    # whatever folder it had last, which is rarely the one the prompt is about.
+    $uri = "claude://code/new"
+    if (-not [string]::IsNullOrWhiteSpace($Folder)) {
+        $uri += "?folder=" + [Uri]::EscapeDataString($Folder)
+    }
+    Start-Process $uri
 
     # Wait until a Claude window is actually in the foreground before typing.
     $deadline = (Get-Date).AddSeconds(30)

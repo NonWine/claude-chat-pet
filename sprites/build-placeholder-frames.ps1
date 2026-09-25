@@ -112,6 +112,12 @@ $manifest = [ordered]@{
     note        = "Placeholder art. Replace the PNGs in frames\<state>\ to swap the character."
     width       = $w
     height      = $h
+
+    # Presentation hints read by New-PetSprite. They restate what the XAML fallback in
+    # pet-icon.ps1 already does for this art, so nothing moves; real art overrides them.
+    displayHeight = 44
+    pixelArt      = $true
+
     states      = $manifestStates
 }
 

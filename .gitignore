@@ -11,3 +11,14 @@ last-response.txt
 
 # Local, machine-specific
 config.json
+
+# Character art that is not ours to redistribute (ripped VN/anime sheets and anything
+# staged next to them). The MIT pixel-buddy pack stays tracked.
+sprites/*-source/
+!sprites/pixel-buddy-source/
+
+# Screen grabs attached to prompts - private, and pruned at runtime anyway
+shots/
+
+# Generated character frames built from a non-redistributable source rip.
+sprites/*-frames/

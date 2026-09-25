@@ -4,6 +4,8 @@
     "note":  "Placeholder art. Replace the PNGs in frames\\\u003cstate\u003e\\ to swap the character.",
     "width":  16,
     "height":  16,
+    "displayHeight":  44,
+    "pixelArt":  true,
     "states":  {
                    "idle":  {
                                 "frameMs":  900,

@@ -1,0 +1,37 @@
+{
+  "name": "Character Name (Source, outfit)",
+  "credit": "Where the art came from and under what terms. Local use only if it is a rip.",
+
+  "displayHeight": 150,
+  "supersample": 2,
+  "overlayOffset": [0, 0],
+  "anchor": "center-top",
+
+  "_check_first": "Overlay two poses at 1:1 and compare the HEADS before writing any of this. Same size means the poses share a scale and can be mixed. Different size means the source draws that pose at another zoom, no alignment can fix it, and only one pose family may be used.",
+  "_nudge": "Any state may add \"nudge\": [dx, dy] in source pixels to shift that pose inside the register canvas.",
+
+  "states": {
+    "idle":     { "frameMs": [2600, 110, 180, 110], "loop": true,  "frames": [
+                    { "body": "body_stand.png", "overlay": "face/eyes_open.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_half.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_shut.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_half.png" } ] },
+    "hover":    { "frameMs": 0,    "loop": false, "frames": [
+                    { "body": "body_stand.png", "overlay": "face/look.png" } ] },
+    "input":    { "frameMs": 0,    "loop": false, "frames": [
+                    { "body": "body_lean.png",  "overlay": "face/attentive.png" } ] },
+    "working":  { "frameMs": 220,  "loop": true,  "frames": [
+                    { "body": "body_work.png",  "overlay": "face/focused_a.png" },
+                    { "body": "body_work.png",  "overlay": "face/focused_b.png" } ] },
+    "thinking": { "frameMs": [520, 340, 340], "loop": true,  "frames": [
+                    { "body": "body_think.png", "overlay": "face/think_a.png" },
+                    { "body": "body_think.png", "overlay": "face/think_b.png" },
+                    { "body": "body_think.png", "overlay": "face/think_c.png" } ] },
+    "done":     { "frameMs": 450,  "loop": true,  "frames": [
+                    { "body": "body_stand.png", "overlay": "face/smile_a.png" },
+                    { "body": "body_stand.png", "overlay": "face/smile_b.png" } ] },
+    "blocking": { "frameMs": 1400, "loop": true,  "frames": [
+                    { "body": "body_stand.png", "overlay": "face/puzzled.png" },
+                    { "body": "body_stand.png", "overlay": "face/annoyed.png" } ] }
+  }
+}
