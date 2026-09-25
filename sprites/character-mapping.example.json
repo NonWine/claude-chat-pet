@@ -8,6 +8,7 @@
   "anchor": "center-top",
 
   "_check_first": "Overlay two poses at 1:1 and compare the HEADS before writing any of this. Same size means the poses share a scale and can be mixed. Different size means the source draws that pose at another zoom, no alignment can fix it, and only one pose family may be used.",
+  "_still": "A state may be one frame with frameMs 0 and it will sit still, which is legal and sometimes right. Beware next to a blinking idle: the character appears to freeze the instant that state is entered. Give even the momentary states a blink.",
   "_nudge": "Any state may add \"nudge\": [dx, dy] in source pixels to shift that pose inside the register canvas.",
 
   "states": {
@@ -16,10 +17,12 @@
                     { "body": "body_stand.png", "overlay": "face/eyes_half.png" },
                     { "body": "body_stand.png", "overlay": "face/eyes_shut.png" },
                     { "body": "body_stand.png", "overlay": "face/eyes_half.png" } ] },
-    "hover":    { "frameMs": 0,    "loop": false, "frames": [
-                    { "body": "body_stand.png", "overlay": "face/look.png" } ] },
-    "input":    { "frameMs": 0,    "loop": false, "frames": [
-                    { "body": "body_lean.png",  "overlay": "face/attentive.png" } ] },
+    "hover":    { "frameMs": [2800, 130], "loop": true, "frames": [
+                    { "body": "body_stand.png", "overlay": "face/look.png" },
+                    { "body": "body_stand.png", "overlay": "face/eyes_shut.png" } ] },
+    "input":    { "frameMs": [3200, 130], "loop": true, "frames": [
+                    { "body": "body_lean.png",  "overlay": "face/attentive.png" },
+                    { "body": "body_lean.png",  "overlay": "face/eyes_shut.png" } ] },
     "working":  { "frameMs": 220,  "loop": true,  "frames": [
                     { "body": "body_work.png",  "overlay": "face/focused_a.png" },
                     { "body": "body_work.png",  "overlay": "face/focused_b.png" } ] },
