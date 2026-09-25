@@ -1,11 +1,12 @@
 # Claude quick-prompt widget.
 #
-#   hover sprite -> auto-expand          Esc          -> collapse back to the sprite
-#   Enter        -> run headless, live status above the input
+#   hover pet    -> auto-expand           Esc          -> collapse back to the pet
+#   Enter        -> run headless; the reply lands in a card above the pet
 #   Ctrl+Enter   -> open a new chat in the desktop app with the prompt pasted in
 #   Ctrl+Wheel   -> scale the whole widget (also Ctrl +/-/0), saved to config.json
+#   drag the pet -> move the widget; the drop point is saved as the new anchor
+#   right-click  -> size / reset / close menu
 #   dbl-click >  -> empty new chat        click status -> open that session in a window
-#   right-click  -> close
 #
 # While collapsed the sprite itself is the status light: grey idle, blue running,
 # amber needs-approval, green done, red error.
@@ -34,6 +35,8 @@ try {
         collapseDelayMs = 700
         focusOnHover    = $false # true = hovering also grabs the keyboard (steals focus)
         panelWidth      = 330
+        anchorRight     = 0      # bottom-right corner the widget grows from; 0 = screen corner
+        anchorBottom    = 0
     }
     if (Test-Path $configPath) {
         try {
@@ -53,8 +56,15 @@ try {
 
     $margin = 24
     $screen = [System.Windows.SystemParameters]::WorkArea
-    $rightAnchor  = $screen.Right - $margin
-    $bottomAnchor = $screen.Bottom - $margin
+
+    # The widget grows from a fixed bottom-right corner, so the input stays put while the
+    # cards above it appear. Dragging moves that corner; it is not the window's top-left.
+    $script:anchorRight  = $screen.Right - $margin
+    $script:anchorBottom = $screen.Bottom - $margin
+    if ([double]$cfg.anchorRight -gt 0 -and [double]$cfg.anchorBottom -gt 0) {
+        $script:anchorRight  = [double]$cfg.anchorRight
+        $script:anchorBottom = [double]$cfg.anchorBottom
+    }
 
     [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -66,11 +76,44 @@ try {
   <Grid x:Name="Root">
    <StackPanel>
 
+    <!-- Where the answer shows up. A headless run has no chat window, so without this the
+         reply would exist only inside jobs\<id>.jsonl. Deliberately OUTSIDE the collapsible
+         panel: it has to survive the widget folding away, and only the X dismisses it. -->
+    <Grid x:Name="AnswerCard" Visibility="Collapsed" Width="$panelW" Margin="0,0,0,8">
+      <Border CornerRadius="18" Background="#F21E2024" BorderBrush="#26FFFFFF"
+              BorderThickness="1" Padding="16,13,14,13">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+            <TextBlock x:Name="AnswerGlyph" Text="" FontSize="12" Foreground="#FF57C08D"
+                       VerticalAlignment="Center" Margin="0,0,7,0"/>
+            <TextBlock x:Name="AnswerTitle" Text="" Foreground="#EDEFF2" FontSize="12.5"
+                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="250"/>
+          </StackPanel>
+          <ScrollViewer MaxHeight="190" VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="AnswerText" Text="" Foreground="#C5CAD3" FontSize="12.5"
+                       TextWrapping="Wrap" LineHeight="17"/>
+          </ScrollViewer>
+          <Border x:Name="AnswerOpen" Margin="0,10,0,0" Padding="9,5" CornerRadius="9"
+                  Background="#2A2D33" Cursor="Hand" HorizontalAlignment="Left"
+                  ToolTip="Open this session in a real Claude window.">
+            <TextBlock Text="Open in app" Foreground="#C9CED6" FontSize="11.5"/>
+          </Border>
+        </StackPanel>
+      </Border>
+      <Border x:Name="AnswerClose" Width="18" Height="18" CornerRadius="9" Background="#2A2D33"
+              BorderBrush="#33FFFFFF" BorderThickness="1"
+              HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-6,-6,0,0"
+              Cursor="Hand" ToolTip="Dismiss">
+        <TextBlock Text="&#10005;" Foreground="#C9CED6" FontSize="8"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Border>
+    </Grid>
+
     <!-- The pet is always on screen; only the panel below it folds away. The status
          colour lives in the glow under its feet, so the character itself stays readable. -->
     <Grid x:Name="PetHost" Width="56" Height="58" HorizontalAlignment="Center"
           Background="Transparent" Cursor="Hand"
-          ToolTip="Hover to open. Ctrl+Wheel to resize. Right-click to close.">
+          ToolTip="Hover to open. Drag to move. Right-click for options.">
       <Ellipse x:Name="PetGlow" Width="30" Height="9" Fill="#FF6B6B6B" Opacity="0.7"
                VerticalAlignment="Bottom" Margin="0,0,0,2">
         <Ellipse.Effect>
@@ -126,6 +169,39 @@ try {
       </Grid>
     </Border>
 
+    <!-- right-click menu; an in-window panel rather than a Popup, so it inherits the
+         window's transparency and cannot land behind a topmost window -->
+    <Border x:Name="MenuCard" Visibility="Collapsed" Width="200" Margin="0,6,0,0"
+            HorizontalAlignment="Center" CornerRadius="14" Background="#F51E2024"
+            BorderBrush="#33FFFFFF" BorderThickness="1" Padding="12,10">
+      <StackPanel>
+        <TextBlock Text="SIZE" Foreground="#6E747E" FontSize="9" Margin="2,0,0,6"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+          <Border x:Name="MenuMinus" Width="28" Height="26" CornerRadius="8" Background="#2A2D33" Cursor="Hand">
+            <TextBlock Text="&#8722;" Foreground="#C9CED6" FontSize="14"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <TextBlock x:Name="MenuScale" Text="100%" Foreground="#EDEFF2" FontSize="12" Width="56"
+                     TextAlignment="Center" VerticalAlignment="Center"/>
+          <Border x:Name="MenuPlus" Width="28" Height="26" CornerRadius="8" Background="#2A2D33" Cursor="Hand">
+            <TextBlock Text="+" Foreground="#C9CED6" FontSize="14"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <Border x:Name="MenuReset" Width="28" Height="26" CornerRadius="8" Background="#2A2D33"
+                  Cursor="Hand" Margin="8,0,0,0" ToolTip="Reset size and position">
+            <TextBlock Text="&#8635;" Foreground="#C9CED6" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+        </StackPanel>
+
+        <Border Height="1" Background="#1AFFFFFF" Margin="0,10,0,8"/>
+
+        <Border x:Name="MenuClose" Padding="8,6" CornerRadius="8" Background="Transparent" Cursor="Hand">
+          <TextBlock Text="Close widget" Foreground="#E06C75" FontSize="12"/>
+        </Border>
+      </StackPanel>
+    </Border>
+
    </StackPanel>
   </Grid>
 </Window>
@@ -138,6 +214,18 @@ try {
     $petImage    = $window.FindName("PetImage")
     $petGlow     = $window.FindName("PetGlow")
     $panel       = $window.FindName("Panel")
+    $answerCard  = $window.FindName("AnswerCard")
+    $answerGlyph = $window.FindName("AnswerGlyph")
+    $answerTitle = $window.FindName("AnswerTitle")
+    $answerText  = $window.FindName("AnswerText")
+    $answerOpen  = $window.FindName("AnswerOpen")
+    $answerClose = $window.FindName("AnswerClose")
+    $menuCard    = $window.FindName("MenuCard")
+    $menuScale   = $window.FindName("MenuScale")
+    $menuMinus   = $window.FindName("MenuMinus")
+    $menuPlus    = $window.FindName("MenuPlus")
+    $menuReset   = $window.FindName("MenuReset")
+    $menuClose   = $window.FindName("MenuClose")
     $promptBox   = $window.FindName("PromptBox")
     $placeholder = $window.FindName("Placeholder")
     $sendButton  = $window.FindName("SendButton")
@@ -215,12 +303,47 @@ try {
     $rootScale = New-Object System.Windows.Media.ScaleTransform
     $root.LayoutTransform = $rootScale
 
+    # A saved anchor can point off-screen after a monitor change, which would hide the
+    # widget with no way to get it back.
+    function Reset-Anchors {
+        $sc = [System.Windows.SystemParameters]::WorkArea
+        $script:anchorRight  = [Math]::Max($sc.Left + 80, [Math]::Min($sc.Right,  $script:anchorRight))
+        $script:anchorBottom = [Math]::Max($sc.Top  + 80, [Math]::Min($sc.Bottom, $script:anchorBottom))
+    }
+    Reset-Anchors
+
     function Move-ToCorner {
         try {
-            $window.Left = $rightAnchor - $window.ActualWidth
-            $window.Top  = $bottomAnchor - $window.ActualHeight
+            $window.Left = $script:anchorRight - $window.ActualWidth
+            $window.Top  = $script:anchorBottom - $window.ActualHeight
         } catch { }
     }
+
+    # ------------------------------------------------------------- animation
+    # Once a property has been animated the animation HOLDS its value and a plain
+    # assignment is silently ignored, so anything set outside an animation clears it first.
+    function New-PetEase([string]$mode) {
+        $e = New-Object System.Windows.Media.Animation.CubicEase
+        $e.EasingMode = $mode
+        return $e
+    }
+
+    function Animate-Prop($target, $dp, [double]$to, [int]$ms, [string]$mode, $onDone) {
+        $a = New-Object System.Windows.Media.Animation.DoubleAnimation
+        $a.To = $to
+        $a.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($ms))
+        $a.EasingFunction = (New-PetEase $mode)
+        if ($onDone) { $a.Add_Completed($onDone) }
+        $target.BeginAnimation($dp, $a)
+    }
+
+    function Set-Prop($target, $dp, [double]$v) {
+        $target.BeginAnimation($dp, $null)
+        $target.SetValue($dp, $v)
+    }
+
+    $OPACITY_DP = [System.Windows.UIElement]::OpacityProperty
+    $SCALEY_DP  = [System.Windows.Media.ScaleTransform]::ScaleYProperty
 
     function Set-Scale([double]$s) {
         $s = [Math]::Round([Math]::Max($MIN_SCALE, [Math]::Min($MAX_SCALE, $s)), 2)
@@ -268,11 +391,99 @@ try {
     }
 
     # --------------------------------------------------------- collapse / hover
+    # The pet never folds away now -- only the panel under it does.
+    #
+    # Unfolding is a LayoutTransform, not a RenderTransform: a layout transform changes the
+    # measured size, so SizeToContent + Move-ToCorner make the window grow with it and the
+    # input edge stays pinned. A render transform would resize the window instantly and only
+    # paint the panel smaller, which reads as a jump.
+    $panelScale = New-Object System.Windows.Media.ScaleTransform(1, 1)
+    $panel.LayoutTransform = $panelScale
+
+    # Hiding happens on a plain timer rather than the animation's Completed callback.
+    # Inside a .GetNewClosure() scriptblock, $script:xxx resolves against the closure's own
+    # module scope, where the variable does not exist -- it reads as $null, so a guard
+    # written there never fires and the panel would stay Visible at zero height forever,
+    # still able to hold the keyboard focus. A normal Add_Tick body has no such problem.
+    $script:panelHideTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:panelHideTimer.Interval = [TimeSpan]::FromMilliseconds(180)
+    $script:panelHideTimer.Add_Tick({
+        try {
+            $script:panelHideTimer.Stop()
+            if ($script:collapsed) {
+                $panel.Visibility = "Collapsed"
+                Move-ToCorner
+            }
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
+
     function Set-Collapsed([bool]$c) {
         $script:collapsed = $c
-        # The pet never folds away now -- only the panel under it does.
-        $panel.Visibility = if ($c) { "Collapsed" } else { "Visible" }
+        $script:panelHideTimer.Stop()
+
+        if (-not $c) {
+            if ($panel.Visibility -ne "Visible") {
+                Set-Prop $panelScale $SCALEY_DP 0
+                Set-Prop $panel $OPACITY_DP 0
+                $panel.Visibility = "Visible"
+            }
+            Animate-Prop $panelScale $SCALEY_DP 1 190 "EaseOut" $null
+            Animate-Prop $panel $OPACITY_DP 1 170 "EaseOut" $null
+            return
+        }
+
+        if ($panel.Visibility -ne "Visible") { Move-ToCorner; return }
+
+        # Keystrokes must never land in a panel the user cannot see.
+        if ($promptBox.IsKeyboardFocusWithin) { [System.Windows.Input.Keyboard]::ClearFocus() }
+
+        Animate-Prop $panelScale $SCALEY_DP 0 150 "EaseIn" $null
+        Animate-Prop $panel $OPACITY_DP 0 130 "EaseIn" $null
+        $script:panelHideTimer.Start()
+    }
+
+    # --------------------------------------------------------------- answer card
+    $script:answerSession = $null
+
+    function Show-Answer($job) {
+        $ok = ($job.State -eq 'done')
+        $answerGlyph.Text = if ($ok) { [string]$SYM_OK } else { [string]$SYM_ERR }
+        $answerGlyph.Foreground = $brushes[$(if ($ok) { 'done' } else { 'error' })]
+        $answerTitle.Text = Get-Short ([string]$job.Prompt) 48
+
+        $body = [string]$job.Answer
+        if ([string]::IsNullOrWhiteSpace($body)) { $body = [string]$job.Detail }
+        $answerText.Text = $body.Trim()
+
+        $script:answerSession = $job.SessionId
+        $answerOpen.Visibility = if ($job.SessionId) { "Visible" } else { "Collapsed" }
+        $answerCard.Visibility = "Visible"
         Move-ToCorner
+
+        if ($ok -and -not [string]::IsNullOrWhiteSpace($body)) {
+            try {
+                [IO.File]::WriteAllText("$PSScriptRoot\last-response.txt", $body,
+                                        (New-Object Text.UTF8Encoding($false)))
+            } catch { }
+        }
+    }
+
+    function Hide-Answer {
+        $answerCard.Visibility = "Collapsed"
+        Move-ToCorner
+    }
+
+    # ---------------------------------------------------------------- menu
+    function Set-Menu([bool]$show) {
+        if ($show) { $menuScale.Text = ("{0:n0}%" -f ([double]$cfg.scale * 100)) }
+        $menuCard.Visibility = if ($show) { "Visible" } else { "Collapsed" }
+        Move-ToCorner
+    }
+
+    function Step-Scale([double]$delta) {
+        Set-Scale ([double]$cfg.scale + $delta)
+        Save-Config
+        $menuScale.Text = ("{0:n0}%" -f ([double]$cfg.scale * 100))
     }
 
     $collapseTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -281,6 +492,7 @@ try {
         try {
             $collapseTimer.Stop()
             if ($root.IsMouseOver) { return }
+            if ($menuCard.Visibility -eq "Visible") { return }
             # keep it open while there is an unsent draft or the caret is in the box
             if ($promptBox.Text.Length -gt 0) { return }
             if ($promptBox.IsKeyboardFocusWithin) { return }
@@ -366,6 +578,9 @@ try {
                 $job.Ended = Get-Date
                 # NOTE: subtype stays "success" even for a failed run -- is_error is the
                 # field that actually decides.
+                # The full reply only exists here -- a headless run has no window to read it
+                # in, so keep it for the answer card.
+                $job.Answer = [string]$ev.result
                 if ($ev.is_error -or $ev.subtype -ne 'success') {
                     $job.State = 'error'
                     $msg = [string]$ev.result
@@ -473,6 +688,12 @@ try {
                     }
                 }
             }
+            foreach ($job in @($script:jobs)) {
+                if ($job.Done -and -not $job.Shown) {
+                    $job.Shown = $true
+                    Show-Answer $job
+                }
+            }
             Update-StatusLine
         }
         catch { $_ | Out-String | Add-Content -Path $errorLog }
@@ -517,6 +738,7 @@ try {
                 Id = $id; Proc = $proc; OutFile = $out; ErrFile = $err; Pos = 0
                 State = 'run'; Detail = 'queued'; Started = Get-Date; Ended = $null
                 Done = $false; Sticky = $false; SessionId = $null
+                Prompt = $text; Answer = ""; Shown = $false
             }
             [void]$script:jobs.Add($job)
             while ($script:jobs.Count -gt 10) { $script:jobs.RemoveAt(0) }
@@ -574,13 +796,88 @@ try {
     $panel.Add_PreviewMouseLeftButtonDown({
         try { $window.Activate() | Out-Null; $promptBox.Focus() | Out-Null } catch { }
     })
+    # Drag the pet to move the widget. The press is "armed" rather than acted on, because
+    # the same button also means "give me the caret": only movement past a few pixels turns
+    # it into a drag, everything else stays a click.
+    $script:dragArmed = $false
+    $script:dragFrom  = New-Object System.Windows.Point(0, 0)
+
     $petHost.Add_PreviewMouseLeftButtonDown({
+        param($s, $e)
         try {
-            Set-Collapsed $false
-            $window.Activate() | Out-Null
-            $promptBox.Focus() | Out-Null
-        } catch { }
+            $script:dragArmed = $true
+            $script:dragFrom  = $e.GetPosition($window)
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
     })
+
+    $petHost.Add_PreviewMouseMove({
+        param($s, $e)
+        try {
+            if (-not $script:dragArmed) { return }
+            if ($e.LeftButton -ne [System.Windows.Input.MouseButtonState]::Pressed) {
+                $script:dragArmed = $false
+                return
+            }
+            $p = $e.GetPosition($window)
+            if ([Math]::Abs($p.X - $script:dragFrom.X) -lt 4 -and
+                [Math]::Abs($p.Y - $script:dragFrom.Y) -lt 4) { return }
+
+            $script:dragArmed = $false
+            $collapseTimer.Stop()
+            $window.DragMove()   # blocks until the button is released
+
+            # Re-anchor to wherever it was dropped, by the bottom-right corner, so the
+            # cards keep growing upward from the same edge.
+            $script:anchorRight  = $window.Left + $window.ActualWidth
+            $script:anchorBottom = $window.Top + $window.ActualHeight
+            Reset-Anchors
+            $cfg.anchorRight  = $script:anchorRight
+            $cfg.anchorBottom = $script:anchorBottom
+            Save-Config
+            Move-ToCorner
+        } catch { $script:dragArmed = $false; $_ | Out-String | Add-Content -Path $errorLog }
+    })
+
+    $petHost.Add_PreviewMouseLeftButtonUp({
+        try {
+            if ($script:dragArmed) {
+                $script:dragArmed = $false
+                Set-Collapsed $false
+                $window.Activate() | Out-Null
+                $promptBox.Focus() | Out-Null
+            }
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
+
+    # ------------------------------------------------------------ card + menu wiring
+    $answerClose.Add_MouseLeftButtonUp({
+        try { Hide-Answer } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
+    $answerOpen.Add_MouseLeftButtonUp({
+        try {
+            # The real session id from system/init. "session=last" would be a guess, and the
+            # CLI's session is not the desktop app's most recent one.
+            if ($script:answerSession) {
+                Start-Process ("claude://code/continue?session=" + $script:answerSession)
+            }
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
+
+    $menuMinus.Add_MouseLeftButtonUp({ try { Step-Scale -0.05 } catch { } })
+    $menuPlus.Add_MouseLeftButtonUp({  try { Step-Scale  0.05 } catch { } })
+    $menuReset.Add_MouseLeftButtonUp({
+        try {
+            $sc = [System.Windows.SystemParameters]::WorkArea
+            $script:anchorRight  = $sc.Right - $margin
+            $script:anchorBottom = $sc.Bottom - $margin
+            $cfg.anchorRight  = 0
+            $cfg.anchorBottom = 0
+            Set-Scale 1.0
+            Save-Config
+            $menuScale.Text = "100%"
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
+    $menuClose.Add_MouseLeftButtonUp({ try { $window.Close() } catch { } })
 
     $window.Add_PreviewMouseWheel({
         param($s, $e)
@@ -600,6 +897,12 @@ try {
     $window.Add_PreviewKeyDown({
         param($s, $e)
         try {
+            # Escape backs out of the menu first, wherever the focus happens to be.
+            if ($e.Key -eq "Escape" -and $menuCard.Visibility -eq "Visible") {
+                $e.Handled = $true
+                Set-Menu $false
+                return
+            }
             $ctrl = [System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control
             if (-not $ctrl) { return }
             $delta = $null
@@ -638,7 +941,14 @@ try {
 
     $sendButton.Add_Click({ & $sendHeadless })
 
-    $window.Add_MouseRightButtonUp({ $window.Close() })
+    # Right-click used to close outright, which made an accidental click destructive.
+    $window.Add_MouseRightButtonUp({
+        param($s, $e)
+        try {
+            $e.Handled = $true
+            Set-Menu ($menuCard.Visibility -ne "Visible")
+        } catch { $_ | Out-String | Add-Content -Path $errorLog }
+    })
     $window.Add_SizeChanged({ Move-ToCorner })
     $window.Add_ContentRendered({
         $pet.SetState('idle')
