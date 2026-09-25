@@ -203,18 +203,24 @@ function New-PetSprite {
         DisplayHeight = $dispH
     }
 
-    # Which file to show at a timeline step. With one option this is the plain old
-    # behaviour; with several it avoids repeating the previous choice, because a random
-    # walk that lands on the same expression three cycles running looks like a bug.
+    # Which file to show at a timeline step. With one option this is the plain old behaviour;
+    # with several it never repeats the previous choice, because a random walk that lands on
+    # the same expression three cycles running looks like a bug rather than like chance.
+    #
+    # The draw excludes the previous choice instead of re-rolling until it differs. Re-rolling
+    # only makes a repeat unlikely - with two options and eight tries it still slips through
+    # about once in 256, which at one pick a second is several times an hour.
     Add-Member -InputObject $sprite -MemberType ScriptMethod -Name PickFrame -Value {
         param($State, [int]$Step)
         $opts = $State.Pick[$Step]
         if ($opts.Count -eq 1) { return $opts[0] }
-        $chosen = $opts[0]
-        for ($try = 0; $try -lt 8; $try++) {
-            $chosen = $opts[(Get-Random -Minimum 0 -Maximum $opts.Count)]
-            if ($chosen -ne $State.LastPick[$Step]) { break }
-        }
+
+        $last = $State.LastPick[$Step]
+        $pool = New-Object System.Collections.ArrayList
+        foreach ($o in $opts) { if ($o -ne $last) { [void]$pool.Add($o) } }
+        if ($pool.Count -eq 0) { $pool = $opts }   # every option is the last one; nothing to vary
+
+        $chosen = $pool[(Get-Random -Minimum 0 -Maximum $pool.Count)]
         $State.LastPick[$Step] = $chosen
         return $chosen
     }
